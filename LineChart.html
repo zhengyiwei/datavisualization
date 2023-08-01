@@ -1,0 +1,212 @@
+<!-- Code from d3-chart-gallery.com -->
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Load d3.js -->
+<script src="https://d3js.org/d3.v4.js"></script>
+
+<head>
+  <title>World Population</title>
+</head>
+<style>
+  #my_dataviz {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .toolTip {
+    position: absolute;
+    display: none;
+    min-width: 30px;
+    max-width: 800px;
+    border-radius: 4px;
+    height: auto;
+    background: rgba(250, 250, 250, 0.9);
+    border: 1px solid #DDD;
+    padding: 4px 8px;
+    font-size: .85rem;
+    text-align: left;
+    z-index: 1000;
+  }
+</style>
+
+<body>
+  <div>
+    <h1>World Population - Time series line chart in each country</h1>
+    <p>A population time-series line chart is a data visualization format used to display the trend of population
+      changes over time for different countries.
+    </p>
+    <p>In this type of line chart, the horizontal axis represents time, while the vertical axis represents the
+      population size. Each country has its own line, which connects the population numbers at each time point, allowing
+      for a clear visual representation of the country's population growth or decline over time.
+    </p>
+    <p>By observing the population line chart for each country, we can compare and analyze the trends in population
+      changes across different nations. Such visual tools can help us understand the dynamics, overall trends, and
+      possible patterns of population development in various countries. This is significant for studying population
+      statistics, formulating population policies, and conducting international comparisons.
+    </p>
+    <p>Population line graphs may exhibit sudden mutations, which refers to the rapid increase or decrease in population
+      at a certain point in time. This phenomenon can be caused by the following reasons:
+
+      Natural disasters: Natural disasters such as infectious diseases, earthquakes, floods, or hurricanes can result in
+      a high number of deaths or rapid population displacement, thus creating mutations on the population line graph.
+
+      Political changes or conflicts: Political changes, wars, or internal conflicts can also lead to large-scale
+      population movements and casualties, causing significant mutations on the population line graph.
+
+      Data recording or measurement errors: Sometimes, errors in data recording or measurement of population statistics
+      may occur. For example, incomplete coverage in census surveys or changes in data collection methods can lead to
+      mutations on the line graph that do not reflect the actual population changes.
+    </p>
+  </div>
+
+  <!-- Initialize a select button -->
+  <select id="selectCountry"></select>
+  <!-- Create a div where the chart will take place -->
+  <div id="my_dataviz"></div>
+
+  <!-- Color Scale -->
+  <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+
+  <script>
+
+    // set the dimensions and margins of the chart
+    var margin = { top: 60, right: 50, bottom: 60, left: 50 },
+      width = window.innerWidth * 0.8 - margin.left - margin.right,
+      height = window.innerHeight * 0.8 - margin.top - margin.bottom;
+
+    // append the svg object to the body of the page
+    var svg = d3.select("#my_dataviz")
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", "translate(" + (margin.left + 50) + "," + margin.top + ")");
+
+    //Read the data
+    d3.csv("https://raw.githubusercontent.com/zhengyiwei/NarrativeVisualization/main/Data/timeseries_population_count.csv", function (data) {
+      // data pre-processing
+      data.forEach((d) => {
+        d.current_population = +d.current_population.replace(/[^0-9]/g, '');
+        // parse date
+        d.time = new Date(d.updated_datetime);
+      });
+      // get countries
+      var countries = [...new Set(data.map(d => d.country))];
+      // re-order countries
+      countries.sort();
+      // add the options to the button
+      d3.select("#selectCountry")
+        .selectAll('myOptions')
+        .data(countries)
+        .enter()
+        .append('option')
+        .text(function (d) { return d; }) // text showed in the menu
+        .attr("value", function (d) { return d; }) // corresponding value returned by the button
+        .property("selected", function (d) { return d === "United States"; });//defaut value
+
+      function update() {
+        // filter data with #selectCountry
+        var selectedOption = d3.select('#selectCountry').property("value")
+        var dataFilter = data.filter(function (d) { return d.country == selectedOption })
+
+        // Add X axis --> it is a date format
+        var x = d3.scaleTime()
+          .domain(d3.extent(dataFilter, function (d) { return d.time; }))
+          .range([0, width]);
+        svg.append("g")
+          .attr("transform", "translate(0," + height + ")")
+          .call(d3.axisBottom(x).ticks(5));
+
+        // Add Y axis
+        var y = d3.scaleLinear()
+          .domain([d3.min(dataFilter, function (d) { return +d.current_population; }), d3.max(dataFilter, function (d) { return +d.current_population; })])
+          .range([height, 0]);
+        svg.append("g")
+          .call(d3.axisLeft(y));
+
+        // Add the line
+        svg.append("path")
+          .datum(dataFilter)
+          .attr("fill", "none")
+          .attr("stroke", "steelblue")
+          .attr("stroke-width", 1.5)
+          .attr("d", d3.line()
+            .x(function (d) { return x(d.time) })
+            .y(function (d) { return y(d.current_population) })
+          );
+
+        // Add the points
+        svg
+          .append("g")
+          .selectAll("dot")
+          .data(dataFilter)
+          .enter()
+          .append("circle")
+          .attr("cx", function (d) { return x(d.time) })
+          .attr("cy", function (d) { return y(d.current_population) })
+          .attr("r", 5)
+          .attr("fill", "#69b3a2")
+          .on("mouseover", function (d, i) {
+            // highlight start
+
+            var parentNodeclass = d3.select(this.parentNode).attr("class");
+            svg.selectAll("path").style("opacity", 0.2);
+            d3.selectAll("circle").style("opacity", 0.2);
+            d3.select(this).attr("r", "10").style("opacity", 1);
+            toolTip
+              .style("left", (event.pageX + 18 + toolTip.node().offsetWidth > window.innerWidth) ? (event.pageX - 18 - toolTip.node().offsetWidth) + "px" : (event.pageX + 18) + "px")
+              .style("top", (event.pageY - toolTip.node().offsetHeight > 0) ? (event.pageY - toolTip.node().offsetHeight) + "px" : (event.pageY + 18) + "px")
+              .style("display", "block")
+              .style("display", "block").html("<strong>" + d.country + "</strong>" +
+                "<br>Population: " + d.current_population +
+                "<br>Date: " + d.time);
+          })
+          .on("mouseout", function (d, i) {
+            // highlight end
+            d3.select(this).attr("r", "5");
+            var parentNodeclass = d3.select(this.parentNode).attr("class");
+            d3.selectAll("path").style("opacity", 1);
+            d3.selectAll("circle").style("opacity", 1);
+            // tooltip end
+            toolTip.style("display", "none");
+          })
+
+        // Add a title  
+        svg
+          .append("text")
+          .attr("x", width / 2)
+          .attr("y", -30)
+          .attr("text-anchor", "middle")
+          .style("font-size", "16px")
+          .style("text-decoration", "underline")
+          .text(selectedOption + " Population over Time");
+
+        toolTip = d3.select("body").append("div").attr("class", "toolTip");
+      }
+
+      // Initialize plot
+      update();
+
+      // When the button is changed, run the updateChart function
+      d3.select("#selectCountry").on("change", function (d) {
+        // recover the option that has been chosen
+        var selectedOption = d3.select(this).property("value")
+        // run the updateChart function with this selected option
+        svg.selectAll("*").remove();
+        update();
+      })
+
+    })
+
+
+  </script>
+
+  <div>
+    <button onclick="window.location.href='ChoroplethMap.html'">1. ChoroplethMap</button>
+    <button onclick="window.location.href='BarChart.html'">2. BarChart</button>
+    <button onclick="window.location.href='LineChart.html'">3. LineChart</button>
+  </div>
+</body>

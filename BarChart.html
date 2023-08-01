@@ -1,0 +1,257 @@
+<!-- Code from d3-graph-gallery.com -->
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Load d3.js & color palette-->
+<script src="https://d3js.org/d3.v4.js"></script>
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+<style>
+  .toolTip {
+    position: absolute;
+    display: none;
+    min-width: 30px;
+    max-width: 800px;
+    border-radius: 4px;
+    height: auto;
+    background: rgba(250, 250, 250, 0.9);
+    border: 1px solid #DDD;
+    padding: 4px 8px;
+    font-size: .85rem;
+    text-align: left;
+    z-index: 1000;
+  }
+</style>
+
+<head>
+  <title>World Population</title>
+</head>
+
+<body>
+  <div>
+    <h1>World Population - Stacked Bar Chart</h1>
+    <p> A stacked bar chart is a commonly used data visualization method for illustrating the quantities or proportions
+      of multiple categories or groups across different dimensions. In the case of world population data, each country
+      represents a category, the x-axis represents population count, and the y-axis represents years.
+    </p>
+    <p>In this chart, each bar for a specific year is composed of multiple stacked rectangles, with each rectangle
+      representing the population count of a country. The height of each rectangle represents the population count of
+      that country in the given year, while the total height of the bar represents the global population count for that
+      year.
+    </p>
+    <p>Through a stacked bar chart, it is possible to visually compare the population counts of different countries for
+      different years and gain an understanding of the overall global population trends over time. Additionally, the use
+      of colors can help differentiate the relative proportions of each country in terms of population and their
+      respective population trends.
+    </p>
+    <p>It is important to note that when using a stacked bar chart to display data, the focus is primarily on the
+      proportions and trends of each category (country) within the whole, rather than the exact numerical values.
+      Therefore, by observing the heights of the bars and the stacked segments, we can better understand the
+      distribution of world population across different countries and years.
+    </p>
+  </div>
+
+
+  <!-- Create a div where the graph will take place -->
+  <div id="my_dataviz"></div>
+
+  <script>
+
+    // set the dimensions and margins of the graph
+    var margin = { top: 10, right: 100, bottom: 20, left: 50 },
+      width = window.innerWidth - margin.left - margin.right - 50,
+      height = window.innerHeight / 2 - margin.top - margin.bottom;
+
+    // append the svg object to the body of the page
+    var svg = d3.select("#my_dataviz")
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform",
+        "translate(" + margin.left + "," + margin.top + ")");
+
+    // Parse the Data
+    const file2021 = "https://raw.githubusercontent.com/zhengyiwei/NarrativeVisualization/main/Data/2021_population.csv";
+    const file2022 = "https://raw.githubusercontent.com/zhengyiwei/NarrativeVisualization/main/Data/2022_population.csv";
+    const file2023 = "https://raw.githubusercontent.com/zhengyiwei/NarrativeVisualization/main/Data/2023_population.csv";
+
+    var data2021 = new Map();
+    var data2022 = new Map();
+    var data2023 = new Map();
+    var countries = new Set();
+    var data = new Map();
+    // create a queue
+    d3.queue()
+      .defer(d3.csv, file2021, function (d) {
+        var columnNames = Object.keys(d);
+        var lastUpdatedColumn; // end with"last_updated"
+        for (var i = 0; i < columnNames.length; i++) {
+          if (columnNames[i].endsWith("last_updated")) {
+            lastUpdatedColumn = columnNames[i];
+            break;
+          }
+        }
+        var population = d[lastUpdatedColumn];
+        population = population.replace(/,/g, '');
+        population = population.replace(/"/g, '');
+        countries.add(d.country);
+        data2021.set(d.country, +population);
+        data2021 = new Map([...data2021.entries()].sort());
+      })
+      .defer(d3.csv, file2022, function (d) {
+        var columnNames = Object.keys(d);
+        var lastUpdatedColumn; // end with"last_updated"
+        for (var i = 0; i < columnNames.length; i++) {
+          if (columnNames[i].endsWith("last_updated")) {
+            lastUpdatedColumn = columnNames[i];
+            break;
+          }
+        }
+        var population = d[lastUpdatedColumn];
+        population = population.replace(/,/g, '');
+        population = population.replace(/"/g, '');
+        countries.add(d.country);
+        data2022.set(d.country, +population);
+        data2022 = new Map([...data2022.entries()].sort());
+      })
+      .defer(d3.csv, file2023, function (d) {
+        var columnNames = Object.keys(d);
+        var lastUpdatedColumn; // end with"last_updated"
+        for (var i = 0; i < columnNames.length; i++) {
+          if (columnNames[i].endsWith("last_updated")) {
+            lastUpdatedColumn = columnNames[i];
+            break;
+          }
+        }
+        var population = d[lastUpdatedColumn];
+        population = population.replace(/,/g, '');
+        population = population.replace(/"/g, '');
+        countries.add(d.country);
+        data2023.set(d.country, +population);
+        data2023 = new Map([...data2023.entries()].sort());
+      })
+      .await(ready);
+
+    function ready() {
+      countries = [...countries].sort();
+      countries = Array.from(countries);
+
+      function processData(data, year) {
+        var processedData = {
+          group: year
+        };
+        countries.forEach(function (d) {
+          if (data.get(d) == undefined) {
+            processedData[d] = 0;
+          } else {
+            processedData[d] = data.get(d);
+          }
+          if (!(processedData[d] >= 0)) {
+            processedData[d] = 0;
+          }
+        });
+        return processedData;
+      }
+      data2021 = processData(data2021, 2021);
+      data2022 = processData(data2022, 2022);
+      data2023 = processData(data2023, 2023);
+
+      data = [data2021, data2022, data2023];
+      data.columns = countries;
+      console.log(data);
+
+
+      // List of subgroups = header of the csv files = soil condition here
+      var subgroups = data.columns.slice(1)
+
+      // List of groups = species here = value of the first column called group -> I show them on the X axis
+      var groups = d3.map(data, function (d) { return (d.group) }).keys()
+
+      // Add X axis
+      var x = d3.scaleLinear()
+        .domain([0, 8000000000])
+        .range([0, width]);
+      svg.append("g")
+        .attr("transform", "translate(0," + height + ")")
+        .call(d3.axisBottom(x).tickSizeOuter(0));
+
+      // Add Y axis
+      var y = d3.scaleBand()
+        .domain(groups)
+        .range([height, 0])
+        .padding([0.2]);
+      svg.append("g")
+        .call(d3.axisLeft(y));
+
+      // color palette = one color per subgroup
+      var color = d3.scaleOrdinal()
+        .domain(subgroups)
+        .range(d3.schemeSet2);
+
+      //stack the data? --> stack per subgroup
+      var stackedData = d3.stack()
+        .keys(subgroups)
+        (data)
+
+      // ----------------
+      // Highlight a specific subgroup when hovered
+      // ----------------
+
+      // What happens when user hover a bar
+      var mouseover = function (d) {
+        // what subgroup are we hovering?
+        var subgroupName = d3.select(this.parentNode).datum().key; // This was the tricky part
+        var subgroupValue = d.data[subgroupName];
+        // Reduce opacity of all rect to 0.2
+        d3.selectAll(".myRect").style("opacity", 0.2)
+        // Highlight all rects of this subgroup with opacity 0.8. It is possible to select them since they have a specific class = their name.
+        d3.select(this.parentNode).style("opacity", 1)
+      }
+
+      // When user do not hover anymore
+      var mouseout = function (d) {
+        // Back to normal opacity: 0.8
+        d3.selectAll(".myRect").style("opacity", 0.8)
+        toolTip.style("display", "none");
+      }
+
+      var mousemove = function (d) {
+        toolTip
+          .style("left", (event.pageX + 18 + toolTip.node().offsetWidth > window.innerWidth) ? (event.pageX - 18 - toolTip.node().offsetWidth) + "px" : (event.pageX + 18) + "px")
+          .style("top", (event.pageY - toolTip.node().offsetHeight > 0) ? (event.pageY - toolTip.node().offsetHeight) + "px" : (event.pageY + 18) + "px")
+          .style("display", "block")
+          .html("<strong>" + d3.select(this.parentNode).datum().key + "</strong>" +
+            "<br>" + d.data.group + " population: " + d.data[d3.select(this.parentNode).datum().key]);
+      }
+      // Show the bars
+      svg.append("g")
+        .selectAll("g")
+        // Enter in the stack data = loop key per key = group per group
+        .data(stackedData)
+        .enter().append("g")
+        .attr("fill", function (d) { return color(d.key); })
+        .attr("class", function (d) { return "myRect " + d.key }) // Add a class to each subgroup: their name
+        .selectAll("rect")
+        // enter a second time = loop subgroup per subgroup to add all rectangles
+        .data(function (d) { return d; })
+        .enter().append("rect")
+        .attr("x", function (d) { return x(d[0]); })
+        .attr("y", function (d) { return y(d.data.group); })
+        .attr("width", function (d) { return x(d[1]) - x(d[0]); })
+        .attr("height", y.bandwidth())
+        .attr("stroke", "grey")
+        .on("mouseover", mouseover)
+        .on("mouseout", mouseout)
+        .on("mousemove", mousemove);
+
+      toolTip = d3.select("body").append("div").attr("class", "toolTip");
+    };
+
+  </script>
+
+  <div>
+    <button onclick="window.location.href='ChoroplethMap.html'">1. ChoroplethMap</button>
+    <button onclick="window.location.href='BarChart.html'">2. BarChart</button>
+    <button onclick="window.location.href='LineChart.html'">3. LineChart</button>
+  </div>
+</body>

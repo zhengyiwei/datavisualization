@@ -1,0 +1,291 @@
+<!-- Code from d3-graph-gallery.com -->
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Load d3.js -->
+<script src="http://d3js.org/d3.v4.js"></script>
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+<script src="https://d3js.org/d3-geo-projection.v2.min.js"></script>
+<style>
+  .toolTip {
+    position: absolute;
+    display: none;
+    min-width: 30px;
+    max-width: 800px;
+    border-radius: 4px;
+    height: auto;
+    background: rgba(250, 250, 250, 0.9);
+    border: 1px solid #DDD;
+    padding: 4px 8px;
+    font-size: .85rem;
+    text-align: left;
+    z-index: 1000;
+  }
+</style>
+
+<head>
+  <title>World Population</title>
+</head>
+
+<body>
+  <div>
+    <h1>World Population - Choropleth Map</h1>
+    <p> A choropleth map is a type of thematic map that uses different shading or colors to represent the distribution
+      or density of a particular variable across geographic regions, such as countries, states, or provinces. In the
+      case
+      of the world population choropleth map, it would show the population density or total population of different
+      countries or regions using a color spectrum or graduated shading.
+    </p>
+    <p> The map would typically divide the world into distinct regions and assign a specific color or shade to each
+      region based on its population data. Darker shades or brighter colors indicate higher population densities or
+      larger populations, while lighter shades or muted colors represent lower densities or smaller populations.
+    </p>
+    <p>By visualizing the population distribution in this way, choropleth maps allow us to quickly grasp patterns and
+      disparities in global population concentrations. They provide a visual tool that aids in understanding population
+      distribution, identifying densely populated areas, and comparing population densities or sizes between different
+      regions or countries.
+    </p>
+  </div>
+
+  <div id='mapFunction' style='display:none'>
+    <hr>
+    <p>Selector Functionality: There is a year selector (select) on the page, which allows users to choose the year they
+      want to display (2021, 2022, 2023).
+    </p>
+    <p>Data Loading: Based on the selected year, population data is loaded from the corresponding CSV file and
+      associated with country ISO codes.
+    </p>
+    <p>Map Rendering: Using D3.js and SVG, the world map is rendered on the page, and different colors are assigned to
+      each country to represent its population density.
+    </p>
+    <p>Color Scale: A color scale is set up based on the population quantity, with darker colors representing higher
+      population density and lighter colors representing lower population density.
+    </p>
+    <p>Legend Display: A rectangular legend with a gradient color is displayed on the page, indicating the population
+      density ranges corresponding to different colors.
+    </p>
+    <p>Interaction Functionality: When the mouse hovers over a country, its name and population data will be displayed.
+    </p>
+    <p>Responsive Design: The map and legend sizes adjust automatically based on the window size.
+    </p>
+  </div>
+  <button id='buttonShow'>Show/Hide Map Functionality</button>
+  <hr>
+  <script>
+    var buttonShow = document.getElementById('buttonShow');
+    var mapFunction = document.getElementById('mapFunction');
+    buttonShow.addEventListener('click', showHide);
+    function showHide() {
+      if (mapFunction.style.display === "none") {
+        mapFunction.style.display = "block";
+      } else {
+        mapFunction.style.display = "none";
+      }
+    }
+  </script>
+
+  <select id="mySelector">
+    <option value="2021">2021</option>
+    <option value="2022">2022</option>
+    <option value="2023">2023</option>
+  </select>
+
+  <!-- Create an element where the map will take place -->
+  <div id="my_dataviz"></div>
+  <script>
+    var csvLine = "https://raw.githubusercontent.com/zhengyiwei/NarrativeVisualization/main/Data/2021_population.csv";
+
+    // action listener
+    const selector = document.getElementById('mySelector');
+    selector.addEventListener('change', updateSelection);
+    var selectedValue = 2021;
+    newsvg();
+    function updateSelection() {
+      selectedValue = document.getElementById('mySelector').value;
+      console.log(selectedValue);
+      if (selectedValue === '2021') {
+        selectedValue = document.getElementById('mySelector').value;
+        csvLine = "https://raw.githubusercontent.com/zhengyiwei/NarrativeVisualization/main/Data/2021_population.csv";
+      } else if (selectedValue === '2022') {
+        selectedValue = document.getElementById('mySelector').value;
+        csvLine = "https://raw.githubusercontent.com/zhengyiwei/NarrativeVisualization/main/Data/2022_population.csv"
+      } else if (selectedValue === '2023') {
+        selectedValue = document.getElementById('mySelector').value;
+        csvLine = "https://raw.githubusercontent.com/zhengyiwei/NarrativeVisualization/main/Data/2023_population.csv";
+      }
+      console.log(csvLine);
+      d3.select("svg").remove();
+      newsvg();
+    }
+    function newsvg() {
+      var margin = { top: 10, right: 20, bottom: 10, left: 10 },
+        width = window.innerWidth - margin.left - margin.right,
+        height = window.innerHeight - margin.top - margin.bottom - 40;
+      // The svg
+      var svg = d3.select("#my_dataviz")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+      // title
+      svg.append("text")
+        .attr("x", margin.left + 30)
+        .attr("y", margin.top + 30)
+        .attr("text-anchor", "left")
+        .attr("font-family", "Arial")
+        .attr("font-size", "25px")
+        .attr("fill", "blue")
+        .text(selectedValue);
+
+      // 在svg中添加一个d3年份选择器，年份为2021、2022、2023
+      var yearSelector = d3.select("svg")
+        .append("g")
+        .attr("class", "yearSelector")
+        .attr("x", margin.left + 30)
+        .attr("y", margin.top + 80);
+
+      // Map and projection
+      var path = d3.geoPath();
+      var projection = d3.geoMercator()
+        .center([0, 20])
+        .translate([width / 2, height / 2]);
+
+      // Data and color scale
+      var data = d3.map();
+
+      var colorScale = d3.scaleSequential()
+        .domain([0, 1500000000])
+        .interpolator(d3.interpolateYlGnBu);
+
+      // legend start and end values
+      var legendStart = 1500000000;
+      var legendEnd = 0;
+
+      // legend height and width
+      var legendHeight = 200;
+      var legendWidth = 20;
+
+      // create a gradient for the legend
+      var defs = svg.append("defs");
+      var linearGradient = defs.append("linearGradient")
+        .attr("id", "legend-gradient")
+        .attr("x1", "0%")
+        .attr("y1", "0%")
+        .attr("x2", "0%")
+        .attr("y2", "100%");
+
+      // add the stops to the gradient
+      var numStops = 10; // 节点数量
+      for (var i = 0; i <= numStops; i++) {
+        var offset = i * 100 / numStops;
+        linearGradient.append("stop")
+          .attr("offset", offset + "%")
+          .attr("stop-color", colorScale(legendStart + (legendEnd - legendStart) * i / numStops));
+      }
+
+      // create the rectangle that will serve as the legend's background
+      svg.append("rect")
+        .attr("x", margin.left)
+        .attr("y", height - legendHeight - margin.bottom)
+        .attr("width", legendWidth)
+        .attr("height", legendHeight)
+        .style("fill", "url(#legend-gradient)");
+
+      // show the legend start and end text
+      svg.append("text")
+        .attr("x", margin.left + 30)
+        .attr("y", height - legendHeight - margin.bottom)
+        .text(legendStart.toLocaleString());
+
+      svg.append("text")
+        .attr("x", margin.left + 30)
+        .attr("y", height - margin.bottom)
+        .text(legendEnd.toLocaleString());
+
+      // Load external data and boot
+      d3.queue()
+        .defer(d3.json, "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson")
+        .defer(d3.csv, csvLine,
+          function (d) {
+            var columnNames = Object.keys(d);
+            var lastUpdatedColumn; // end with"last_updated"
+            for (var i = 0; i < columnNames.length; i++) {
+              if (columnNames[i].endsWith("last_updated")) {
+                lastUpdatedColumn = columnNames[i];
+                break;
+              }
+            }
+            var population = d[lastUpdatedColumn];
+            population = population.replace(/,/g, '');
+            population = population.replace(/"/g, '');
+            data.set(d.iso_code, +population);
+          })
+        .await(ready);
+
+      function ready(error, topo) {
+
+        let mouseover = function (d) {
+          d3.selectAll(".Country")
+            .transition()
+            .duration(200)
+            .style("opacity", .5)
+          d3.select(this)
+            .transition()
+            .duration(200)
+            .style("opacity", 1)
+            .style("stroke", "black")
+        }
+
+        let mouseout = function (d) {
+          d3.selectAll(".Country")
+            .transition()
+            .duration(200)
+            .style("opacity", 1)
+          d3.select(this)
+            .transition()
+            .duration(200)
+            .style("stroke", "none")
+          toolTip.style("display", "none");
+        }
+
+        let mousemove = function (d) {
+          toolTip
+            .style("left", (event.pageX + 18 + toolTip.node().offsetWidth > window.innerWidth) ? (event.pageX - 18 - toolTip.node().offsetWidth) + "px" : (event.pageX + 18) + "px")
+            .style("top", (event.pageY - toolTip.node().offsetHeight > 0) ? (event.pageY - toolTip.node().offsetHeight) + "px" : (event.pageY + 18) + "px")
+            .style("display", "block")
+            .html("<strong>" + d.properties.name + "</strong>" + "<br>Population: " + (data.get(d.id) ? data.get(d.id).toLocaleString() : "No data"));
+        }
+
+        // Draw the map
+        svg.append("g")
+          .selectAll("path")
+          .data(topo.features)
+          .enter()
+          .append("path")
+          // draw each country
+          .attr("d", d3.geoPath()
+            .projection(projection)
+          )
+          // set the color of each country
+          .attr("fill", function (d) {
+            d.total = data.get(d.id) || 0;
+            return colorScale(d.total);
+          })
+          .style("stroke", "transparent")
+          .attr("class", function (d) { return "Country" })
+          .style("opacity", 1)
+          .on("mouseover", mouseover)
+          .on("mouseout", mouseout)
+          .on("mousemove", mousemove);
+        toolTip = d3.select("body").append("div").attr("class", "toolTip");
+      }
+    }
+
+  </script>
+
+  <div>
+    <button onclick="window.location.href='ChoroplethMap.html'">1. ChoroplethMap</button>
+    <button onclick="window.location.href='BarChart.html'">2. BarChart</button>
+    <button onclick="window.location.href='LineChart.html'">3. LineChart</button>
+  </div>
+</body>
